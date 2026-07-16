@@ -29,7 +29,7 @@ def test_confirms_order_and_decrements_stock(mock_notify, mock_random, user, pro
 
 @pytest.mark.django_db
 @patch('apps.orders.tasks.random.random', return_value=0.99)
-def test_marks_failed_on_payment_rejection(mock_random, user, product):
+def test_marks_failed_on_payment_rejection(mock_random, no_broadcast, user, product):
     order = make_pending_order(user, product, quantity=3)
 
     verify_payment(order.id)
@@ -38,6 +38,7 @@ def test_marks_failed_on_payment_rejection(mock_random, user, product):
     product.refresh_from_db()
     assert order.status == Order.Status.FAILED
     assert product.stock_quantity == 10
+    no_broadcast.assert_called_once_with(order)
 
 
 @pytest.mark.django_db
@@ -58,13 +59,14 @@ def test_marks_failed_when_stock_no_longer_sufficient(mock_random, user, product
 @pytest.mark.django_db
 @patch('apps.orders.tasks.random.random', return_value=0.1)
 @patch('apps.products.models.Product.objects.select_for_update', side_effect=RuntimeError('boom'))
-def test_marks_failed_on_unexpected_error(mock_locked, mock_random, user, product):
+def test_marks_failed_on_unexpected_error(mock_locked, mock_random, no_broadcast, user, product):
     order = make_pending_order(user, product, quantity=3)
 
     verify_payment(order.id)
 
     order.refresh_from_db()
     assert order.status == Order.Status.FAILED
+    no_broadcast.assert_called_once_with(order)
 
 
 @pytest.mark.django_db

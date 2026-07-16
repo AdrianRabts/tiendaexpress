@@ -20,3 +20,9 @@ def product(db):
 def no_sleep():
     with patch('apps.orders.tasks.time.sleep'):
         yield
+
+
+@pytest.fixture(autouse=True)
+def no_broadcast():
+    with patch('apps.orders.tasks.broadcast_order_update') as mock_broadcast:
+        yield mock_broadcast
