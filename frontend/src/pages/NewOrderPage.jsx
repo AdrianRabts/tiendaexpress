@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { fetchProducts } from '../api/products'
 import { createOrder } from '../api/orders'
 
@@ -65,19 +65,27 @@ export default function NewOrderPage() {
   }
 
   if (isLoadingProducts) {
-    return <p>Cargando productos...</p>
+    return <p className="empty-state">Cargando productos...</p>
   }
 
   return (
     <div className="new-order-page">
-      <h1>Nuevo pedido</h1>
+      <header className="page-header">
+        <h1>Nuevo pedido</h1>
+        <Link to="/orders" className="btn-ghost">
+          Volver
+        </Link>
+      </header>
       <form onSubmit={handleSubmit}>
-        <ul className="product-list">
+        <ul className="list-card">
           {products.map((product) => (
             <li key={product.id} className="product-row">
-              <span>
-                {product.name} — ${product.price} (stock: {product.stock_quantity})
-              </span>
+              <div className="product-info">
+                <span className="product-name">{product.name}</span>
+                <span className="product-meta">
+                  ${product.price} · stock disponible: {product.stock_quantity}
+                </span>
+              </div>
               <input
                 type="number"
                 min="0"
@@ -88,7 +96,7 @@ export default function NewOrderPage() {
           ))}
         </ul>
         {error && <p className="form-error">{error}</p>}
-        <button type="submit" disabled={isSubmitting}>
+        <button type="submit" className="btn-primary" disabled={isSubmitting}>
           {isSubmitting ? 'Creando...' : 'Crear pedido'}
         </button>
       </form>

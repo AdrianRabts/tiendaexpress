@@ -1,6 +1,8 @@
 # TiendaExpress OMS
 
-Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica el pago de forma asíncrona con Celery y confirma o rechaza el pedido según el resultado. Backend en Django + DRF + Celery/RabbitMQ + PostgreSQL, frontend en React (Vite) con autenticación JWT.
+Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica el pago de forma asíncrona con Celery y confirma o rechaza el pedido según el resultado.
+
+**Stack:** Django, DRF, Celery, RabbitMQ, PostgreSQL · React (Vite), Axios, JWT
 
 ## Requisitos previos
 
@@ -24,10 +26,12 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
    npm install
    npm run dev
    ```
-6. URLs disponibles:
-   - Backend: http://localhost:8000
-   - Panel de RabbitMQ: http://localhost:15672
-   - Frontend: http://localhost:5173
+
+| Servicio  | URL                          |
+| --------- | ---------------------------- |
+| Backend   | http://localhost:8000        |
+| RabbitMQ  | http://localhost:15672       |
+| Frontend  | http://localhost:5173        |
 
 `seed_data` crea un usuario de prueba y 5 productos con distinto stock.
 
@@ -35,6 +39,17 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
 
 - Email: `demo@tiendaexpress.com`
 - Password: `Demo12345!`
+
+## Endpoints principales
+
+| Método | Ruta                    | Descripción                                  |
+| ------ | ------------------------ | --------------------------------------------- |
+| POST   | `/api/auth/login/`       | Obtiene `access` y `refresh`                  |
+| POST   | `/api/auth/refresh/`     | Renueva el `access`                            |
+| GET    | `/api/products/`         | Listado paginado de productos                 |
+| POST   | `/api/orders/`           | Crea un pedido, valida stock                   |
+| GET    | `/api/orders/`           | Lista los pedidos del usuario, filtra por `status` |
+| GET    | `/api/orders/{id}/`      | Detalle de un pedido con sus ítems              |
 
 ## Flujo de pedidos
 

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import AppLayout from './components/AppLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import NewOrderPage from './pages/NewOrderPage'
@@ -9,21 +10,15 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
-        path="/orders"
         element={
           <ProtectedRoute>
-            <OrdersListPage />
+            <AppLayout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/orders/new"
-        element={
-          <ProtectedRoute>
-            <NewOrderPage />
-          </ProtectedRoute>
-        }
-      />
+      >
+        <Route path="/orders" element={<OrdersListPage />} />
+        <Route path="/orders/new" element={<NewOrderPage />} />
+      </Route>
       <Route path="*" element={<Navigate to="/orders" replace />} />
     </Routes>
   )

@@ -38,12 +38,18 @@ export default function OrdersListPage() {
 
   return (
     <div className="orders-page">
-      <header className="orders-header">
+      <header className="page-header">
         <h1>Pedidos</h1>
-        <Link to="/orders/new">Nuevo pedido</Link>
+        <Link to="/orders/new" className="btn-primary">
+          Nuevo pedido
+        </Link>
       </header>
 
-      <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+      <select
+        className="status-filter"
+        value={statusFilter}
+        onChange={(event) => setStatusFilter(event.target.value)}
+      >
         <option value="">Todos los estados</option>
         <option value="PENDING">Pendiente</option>
         <option value="CONFIRMED">Confirmado</option>
@@ -53,16 +59,16 @@ export default function OrdersListPage() {
       {error && <p className="form-error">{error}</p>}
 
       {isLoading ? (
-        <p>Cargando...</p>
+        <p className="empty-state">Cargando...</p>
       ) : orders.length === 0 ? (
-        <p>No hay pedidos para mostrar.</p>
+        <p className="empty-state">No hay pedidos para mostrar.</p>
       ) : (
-        <ul className="orders-list">
+        <ul className="list-card">
           {orders.map((order) => (
             <li key={order.id} className="order-row">
-              <span>#{order.id}</span>
+              <span className="order-id">#{order.id}</span>
               <OrderStatusBadge status={order.status} />
-              <span>{new Date(order.created_at).toLocaleString()}</span>
+              <span className="order-date">{new Date(order.created_at).toLocaleString()}</span>
             </li>
           ))}
         </ul>
