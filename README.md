@@ -1,57 +1,65 @@
-# TiendaExpress
+# TiendaExpress OMS
 
-Sistema de gestión de pedidos (OMS) para un e-commerce. Backend en Django + DRF + Celery/RabbitMQ, frontend en React.
+Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica el pago de forma asíncrona con Celery y confirma o rechaza el pedido según el resultado. Backend en Django + DRF + Celery/RabbitMQ + PostgreSQL, frontend en React (Vite) con autenticación JWT.
+
+## Requisitos previos
+
+- Docker y Docker Compose
+- Node.js (para correr el frontend fuera de Docker)
 
 ## Cómo levantar el proyecto
 
-1. Copia `.env.example` a `.env` y ajusta los valores si hace falta.
-2. Levanta los servicios:
-
+1. Clonar el repositorio
+2. Copiar `.env.example` a `.env`
+3. `docker-compose up --build`
+4. En otra terminal, aplicar migraciones y cargar el seed:
    ```bash
-   docker-compose up --build
+   docker-compose exec web python manage.py migrate
+   docker-compose exec web python manage.py seed_data
    ```
-
-3. Servicios disponibles:
-   - Django: http://localhost:8000
+5. Levantar el frontend:
+   ```bash
+   cd frontend
+   cp .env.example .env
+   npm install
+   npm run dev
+   ```
+6. URLs disponibles:
+   - Backend: http://localhost:8000
    - Panel de RabbitMQ: http://localhost:15672
+   - Frontend: http://localhost:5173
 
-## Migraciones y datos de prueba
+`seed_data` crea un usuario de prueba y 5 productos con distinto stock.
 
-Con los servicios levantados:
+## Credenciales de prueba
 
-```bash
-docker-compose exec web python manage.py migrate
-docker-compose exec web python manage.py seed_data
-```
-
-El comando `seed_data` crea un usuario de prueba y 5 productos con distinto stock.
-
-**Usuario de prueba:**
 - Email: `demo@tiendaexpress.com`
 - Password: `Demo12345!`
 
-Con estas credenciales podés hacer login en `POST /api/auth/login/` y usar el `access` recibido para listar productos en `GET /api/products/`.
+## Flujo de pedidos
 
-## Flujo de pedidos (asíncrono)
-
-`POST /api/orders/` valida stock y crea el pedido en `PENDING`, y dispara `verify_payment` (Celery). Esta tarea simula un retardo y aprueba el pago con 80% de probabilidad (`random.random()`), para poder observar ambos flujos (`CONFIRMED` y `FAILED`) sin depender de un proveedor de pagos real. Si aprueba, descuenta el stock dentro de una transacción con `select_for_update()` sobre los productos (revalidando que el stock siga alcanzando, para evitar sobreventa entre pedidos concurrentes) y dispara `send_notification`. Cualquier error inesperado durante la confirmación deja el pedido en `FAILED` en vez de `PENDING` colgado.
-
-`GET /api/orders/` y `GET /api/orders/{id}/` solo devuelven los pedidos del usuario autenticado; el listado admite `?status=PENDING|CONFIRMED|FAILED`.
-
-## Frontend
-
-```bash
-cd frontend
-cp .env.example .env
-npm install
-npm run dev
-```
-
-Corre en http://localhost:5173 (ya habilitado en `CORS_ALLOWED_ORIGINS` del backend). `VITE_API_URL` en `.env` apunta a la URL del backend.
-
-- Login guarda `access`/`refresh` en `localStorage`; un interceptor de Axios los adjunta a cada request y, ante un 401, intenta refrescar una vez antes de mandar a `/login`.
-- El listado de pedidos hace polling cada 4s mientras haya algún pedido en `PENDING`.
+`POST /api/orders/` valida stock y crea el pedido en `PENDING`, disparando la tarea Celery `verify_payment`. Esta simula un retardo y aprueba el pago con 80% de probabilidad; si aprueba, descuenta el stock dentro de una transacción con `select_for_update()` (revalidando para evitar sobreventa entre pedidos concurrentes) y marca el pedido `CONFIRMED`; si no, lo marca `FAILED` sin tocar el stock.
 
 ## Decisiones de diseño
 
-_Pendiente — se documentará al cerrar el proyecto._
+- **Monorepo con `backend/` y `frontend/` separados.** Permite levantar todo con un solo `docker-compose up` desde la raíz sin coordinar dos repositorios, algo razonable para una prueba take-home.
+- **Apps Django separadas (`users`, `products`, `orders`).** Cada una con una sola responsabilidad, evitando el modelo "todo en una app" que se vuelve difícil de mantener a medida que el proyecto crece.
+- **`CustomUser` con `email` como identificador.** El MER del enunciado usa `email`, no `username`. Partir de `AbstractBaseUser` desde el inicio evita tener que migrar el modelo de usuario más adelante, algo costoso en Django.
+- **Tarea Celery con 80% de probabilidad de éxito (`random.random()`).** Permite observar ambos flujos (`CONFIRMED` y `FAILED`) en pruebas reales sin depender de un proveedor de pagos externo. Una regla determinística (por ejemplo, par/impar de ID) sería más predecible, pero menos representativa de un entorno real.
+- **`select_for_update()` con `order_by('id')` al descontar stock.** El orden es intencional: cuando dos transacciones necesitan bloquear varios productos, hacerlo siempre en el mismo orden previene deadlocks (sin esto, una transacción podría bloquear el producto 1 esperando el 2 mientras otra bloquea el 2 esperando el 1).
+- **`transaction.on_commit()` para disparar la tarea Celery.** Si se disparara dentro del bloque `atomic()`, el worker podría llegar a leer el pedido antes de que la transacción se confirmara en la base de datos. Con `on_commit()`, la tarea se encola recién cuando el commit ya ocurrió.
+- **Polling en el frontend con `setInterval`.** El enunciado pedía reflejar el cambio de estado sin recargar. WebSockets sería la solución ideal en producción, pero agrega infraestructura (Django Channels, un channel layer sobre Redis) que excede el alcance de una prueba de 8 horas. El polling cada pocos segundos cubre el requerimiento con una complejidad razonable.
+- **`IsAuthenticated` como permiso por defecto (`DEFAULT_PERMISSION_CLASSES`).** Protege todos los endpoints globalmente, evitando el riesgo de aplicar el permiso vista por vista y olvidarse de alguna.
+
+## Qué haría distinto con más tiempo
+
+- Tests unitarios con `pytest` para la lógica de estados de `verify_payment`
+- WebSockets (Django Channels) en lugar de polling para el cambio de estado en tiempo real
+- Dockerizar también el frontend para levantar todo con un solo `docker-compose up`
+- Paginación en el listado de pedidos del frontend
+
+## Puntos extra implementados
+
+- Docker Compose funcional de punta a punta
+- Manejo de concurrencia con `select_for_update()` y `order_by('id')` para prevenir deadlocks
+- Polling en el frontend para reflejar el cambio de estado sin recargar
