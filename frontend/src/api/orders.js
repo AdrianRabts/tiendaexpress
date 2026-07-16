@@ -1,7 +1,9 @@
 import apiClient from './client'
 
-export function fetchOrders(status) {
-  return apiClient.get('/api/orders/', { params: status ? { status } : {} }).then((res) => res.data)
+export function fetchOrders(status, page = 1) {
+  const params = { page }
+  if (status) params.status = status
+  return apiClient.get('/api/orders/', { params }).then((res) => res.data)
 }
 
 export function fetchOrder(id) {

@@ -194,6 +194,19 @@ button[type='submit']:not(:disabled):hover {
   color: var(--text);
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.pagination-page {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .form-error {
   color: var(--failed-fg);
   font-size: 13px;
