@@ -1,8 +1,7 @@
-import { createContext, useContext, useState } from 'react'
+import { useState } from 'react'
 import { login as loginRequest } from '../api/auth'
 import { clearTokens, getAccessToken, setTokens } from '../api/tokenStorage'
-
-const AuthContext = createContext(null)
+import { AuthContext } from './context'
 
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(getAccessToken()))
@@ -23,8 +22,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  return useContext(AuthContext)
 }
