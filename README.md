@@ -38,6 +38,20 @@ Con estas credenciales podés hacer login en `POST /api/auth/login/` y usar el `
 
 `GET /api/orders/` y `GET /api/orders/{id}/` solo devuelven los pedidos del usuario autenticado; el listado admite `?status=PENDING|CONFIRMED|FAILED`.
 
+## Frontend
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Corre en http://localhost:5173 (ya habilitado en `CORS_ALLOWED_ORIGINS` del backend). `VITE_API_URL` en `.env` apunta a la URL del backend.
+
+- Login guarda `access`/`refresh` en `localStorage`; un interceptor de Axios los adjunta a cada request y, ante un 401, intenta refrescar una vez antes de mandar a `/login`.
+- El listado de pedidos hace polling cada 4s mientras haya algún pedido en `PENDING`.
+
 ## Decisiones de diseño
 
 _Pendiente — se documentará al cerrar el proyecto._

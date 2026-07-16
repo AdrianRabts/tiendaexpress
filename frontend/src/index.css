@@ -1,0 +1,161 @@
+:root {
+  --text: #2b2b33;
+  --bg: #fff;
+  --border: #e0e0e5;
+  --accent: #6d28d9;
+  --pending: #b8860b;
+  --confirmed: #1a7f37;
+  --failed: #c92a2a;
+
+  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #e5e5ea;
+    --bg: #16171d;
+    --border: #33343d;
+    --accent: #a78bfa;
+    --pending: #e0b13d;
+    --confirmed: #4ade80;
+    --failed: #f87171;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+h1 {
+  font-size: 28px;
+  margin: 0 0 24px;
+}
+
+.auth-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 48px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+}
+
+button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.form-error {
+  color: var(--failed);
+  font-size: 14px;
+}
+
+.orders-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.orders-header a {
+  color: var(--accent);
+}
+
+.orders-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.status-badge {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.status-pending {
+  color: var(--pending);
+  background: color-mix(in srgb, var(--pending) 15%, transparent);
+}
+
+.status-confirmed {
+  color: var(--confirmed);
+  background: color-mix(in srgb, var(--confirmed) 15%, transparent);
+}
+
+.status-failed {
+  color: var(--failed);
+  background: color-mix(in srgb, var(--failed) 15%, transparent);
+}
+
+.product-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.product-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-row input {
+  width: 70px;
+}
