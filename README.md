@@ -7,24 +7,17 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
 ## Requisitos previos
 
 - Docker y Docker Compose
-- Node.js (para correr el frontend fuera de Docker)
+- Node.js (opcional, solo si preferís correr el frontend fuera de Docker)
 
 ## Cómo levantar el proyecto
 
 1. Clonar el repositorio
-2. Copiar `.env.example` a `.env`
+2. Copiar `.env.example` a `.env` (raíz y `frontend/`)
 3. `docker-compose up --build`
 4. En otra terminal, aplicar migraciones y cargar el seed:
    ```bash
    docker-compose exec web python manage.py migrate
    docker-compose exec web python manage.py seed_data
-   ```
-5. Levantar el frontend:
-   ```bash
-   cd frontend
-   cp .env.example .env
-   npm install
-   npm run dev
    ```
 
 | Servicio  | URL                          |
@@ -33,7 +26,7 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
 | RabbitMQ  | http://localhost:15672       |
 | Frontend  | http://localhost:5173        |
 
-`seed_data` crea un usuario de prueba y 5 productos con distinto stock.
+`seed_data` crea un usuario de prueba y 5 productos con distinto stock. El `docker-compose up` levanta los cuatro servicios de backend más el frontend; si preferís correr el frontend fuera de Docker (hot-reload nativo), `cd frontend && npm install && npm run dev`.
 
 ## Credenciales de prueba
 
@@ -55,6 +48,14 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
 
 `POST /api/orders/` valida stock y crea el pedido en `PENDING`, disparando la tarea Celery `verify_payment`. Esta simula un retardo y aprueba el pago con 80% de probabilidad; si aprueba, descuenta el stock dentro de una transacción con `select_for_update()` (revalidando para evitar sobreventa entre pedidos concurrentes) y marca el pedido `CONFIRMED`; si no, lo marca `FAILED` sin tocar el stock.
 
+## Tests
+
+```bash
+docker-compose exec web pytest
+```
+
+Cubren las transiciones de estado de `verify_payment` (confirmado, fallo de pago, fallo por stock insuficiente en la revalidación, fallo por error inesperado) y la validación de stock en `POST /api/orders/`.
+
 ## Decisiones de diseño
 
 - **Monorepo con `backend/` y `frontend/` separados.** Permite levantar todo con un solo `docker-compose up` desde la raíz sin coordinar dos repositorios, algo razonable para una prueba take-home.
@@ -68,13 +69,13 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
 
 ## Qué haría distinto con más tiempo
 
-- Tests unitarios con `pytest` para la lógica de estados de `verify_payment`
 - WebSockets (Django Channels) en lugar de polling para el cambio de estado en tiempo real
-- Dockerizar también el frontend para levantar todo con un solo `docker-compose up`
-- Paginación en el listado de pedidos del frontend
+- Más cobertura de tests (serializers de `users`/`products`, interceptor de JWT en el frontend)
 
 ## Puntos extra implementados
 
-- Docker Compose funcional de punta a punta
+- Docker Compose funcional de punta a punta, incluyendo el frontend
 - Manejo de concurrencia con `select_for_update()` y `order_by('id')` para prevenir deadlocks
 - Polling en el frontend para reflejar el cambio de estado sin recargar
+- Paginación en el listado de pedidos del frontend
+- Tests unitarios con `pytest` para la lógica de estados de `verify_payment` y la validación de stock
