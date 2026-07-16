@@ -6,5 +6,8 @@ django-celery-results
 psycopg2-binary
 python-decouple
 django-cors-headers
+daphne
+channels
+channels-redis
 pytest
 pytest-django

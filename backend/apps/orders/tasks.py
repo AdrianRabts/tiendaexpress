@@ -2,7 +2,9 @@ import logging
 import random
 import time
 
+from asgiref.sync import async_to_sync
 from celery import shared_task
+from channels.layers import get_channel_layer
 from django.db import transaction
 
 from apps.products.models import Product
@@ -12,6 +14,16 @@ from .models import Order
 logger = logging.getLogger(__name__)
 
 PAYMENT_SUCCESS_RATE = 0.8
+
+
+def broadcast_order_update(order):
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+    async_to_sync(channel_layer.group_send)(
+        f'orders_user_{order.user_id}',
+        {'type': 'order.update', 'order_id': order.id, 'status': order.status},
+    )
 
 
 @shared_task
@@ -27,6 +39,7 @@ def verify_payment(order_id):
     if random.random() >= PAYMENT_SUCCESS_RATE:
         order.status = Order.Status.FAILED
         order.save(update_fields=['status'])
+        broadcast_order_update(order)
         return
 
     try:
@@ -42,6 +55,7 @@ def verify_payment(order_id):
                 if locked_products[item.product_id].stock_quantity < item.quantity:
                     order.status = Order.Status.FAILED
                     order.save(update_fields=['status'])
+                    transaction.on_commit(lambda: broadcast_order_update(order))
                     return
 
             for item in items:
@@ -51,10 +65,12 @@ def verify_payment(order_id):
 
             order.status = Order.Status.CONFIRMED
             order.save(update_fields=['status'])
+            transaction.on_commit(lambda: broadcast_order_update(order))
     except Exception:
         logger.exception('Unexpected error confirming order %s', order_id)
         order.status = Order.Status.FAILED
         order.save(update_fields=['status'])
+        broadcast_order_update(order)
         return
 
     send_notification.delay(order.id)

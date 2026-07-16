@@ -24,6 +24,11 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
   web:
     build: ./backend
     command: python manage.py runserver 0.0.0.0:8000
@@ -38,6 +43,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_started
+      redis:
+        condition: service_started
 
   worker:
     build: ./backend
@@ -50,6 +57,8 @@ services:
       db:
         condition: service_healthy
       rabbitmq:
+        condition: service_started
+      redis:
         condition: service_started
 
   frontend:
