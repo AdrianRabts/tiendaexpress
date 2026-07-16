@@ -41,6 +41,10 @@ cd frontend && npm install && npm run dev
 - Email: `demo@tiendaexpress.com`
 - Password: `Demo12345!`
 
+**Panel de RabbitMQ** (http://localhost:15672):
+- Usuario: `guest`
+- Password: `guest`
+
 ## Endpoints principales
 
 | Método | Ruta                          | Descripción                                    |
