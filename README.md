@@ -2,7 +2,7 @@
 
 Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica el pago de forma asíncrona con Celery y confirma o rechaza el pedido según el resultado.
 
-**Stack:** Django, DRF, Celery, RabbitMQ, PostgreSQL · React (Vite), Axios, JWT
+**Stack:** Django, DRF, Celery, RabbitMQ, Channels (WebSockets), Redis, PostgreSQL · React (Vite), Axios, JWT
 
 ## Requisitos previos
 
@@ -26,7 +26,7 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
 | RabbitMQ  | http://localhost:15672       |
 | Frontend  | http://localhost:5173        |
 
-`seed_data` crea un usuario de prueba y 5 productos con distinto stock. El `docker-compose up` levanta los cuatro servicios de backend más el frontend; si preferís correr el frontend fuera de Docker (hot-reload nativo), `cd frontend && npm install && npm run dev`.
+`seed_data` crea un usuario de prueba y 5 productos con distinto stock. El `docker-compose up` levanta los cinco servicios de backend (db, rabbitmq, redis, web, worker) más el frontend; si preferís correr el frontend fuera de Docker (hot-reload nativo), `cd frontend && npm install && npm run dev`.
 
 ## Credenciales de prueba
 
@@ -43,18 +43,20 @@ Sistema de gestión de pedidos (OMS) para un e-commerce: valida stock, verifica 
 | POST   | `/api/orders/`           | Crea un pedido, valida stock                   |
 | GET    | `/api/orders/`           | Lista los pedidos del usuario, filtra por `status` |
 | GET    | `/api/orders/{id}/`      | Detalle de un pedido con sus ítems              |
+| WS     | `/ws/orders/?token=<access>` | Notifica cambios de estado de los pedidos del usuario en tiempo real |
 
 ## Flujo de pedidos
 
-`POST /api/orders/` valida stock y crea el pedido en `PENDING`, disparando la tarea Celery `verify_payment`. Esta simula un retardo y aprueba el pago con 80% de probabilidad; si aprueba, descuenta el stock dentro de una transacción con `select_for_update()` (revalidando para evitar sobreventa entre pedidos concurrentes) y marca el pedido `CONFIRMED`; si no, lo marca `FAILED` sin tocar el stock.
+`POST /api/orders/` valida stock y crea el pedido en `PENDING`, disparando la tarea Celery `verify_payment`. Esta simula un retardo y aprueba el pago con 80% de probabilidad; si aprueba, descuenta el stock dentro de una transacción con `select_for_update()` (revalidando para evitar sobreventa entre pedidos concurrentes) y marca el pedido `CONFIRMED`; si no, lo marca `FAILED` sin tocar el stock. En cada transición se notifica por WebSocket al grupo del usuario dueño del pedido, para que el frontend refleje el cambio sin recargar ni hacer polling.
 
 ## Tests
 
 ```bash
-docker-compose exec web pytest
+docker-compose exec web pytest      # backend
+cd frontend && npm test             # frontend
 ```
 
-Cubren las transiciones de estado de `verify_payment` (confirmado, fallo de pago, fallo por stock insuficiente en la revalidación, fallo por error inesperado) y la validación de stock en `POST /api/orders/`.
+El backend cubre las transiciones de estado de `verify_payment` (confirmado, fallo de pago, fallo por stock insuficiente en la revalidación, fallo por error inesperado), la validación de stock en `POST /api/orders/`, el manager de `CustomUser`, y el listado/autenticación de `products`. El frontend cubre el interceptor de Axios: adjunta el token, refresca una vez ante un 401 y reintenta, y limpia la sesión si el refresh también falla.
 
 ## Decisiones de diseño
 
@@ -64,18 +66,18 @@ Cubren las transiciones de estado de `verify_payment` (confirmado, fallo de pago
 - **Tarea Celery con 80% de probabilidad de éxito (`random.random()`).** Permite observar ambos flujos (`CONFIRMED` y `FAILED`) en pruebas reales sin depender de un proveedor de pagos externo. Una regla determinística (por ejemplo, par/impar de ID) sería más predecible, pero menos representativa de un entorno real.
 - **`select_for_update()` con `order_by('id')` al descontar stock.** El orden es intencional: cuando dos transacciones necesitan bloquear varios productos, hacerlo siempre en el mismo orden previene deadlocks (sin esto, una transacción podría bloquear el producto 1 esperando el 2 mientras otra bloquea el 2 esperando el 1).
 - **`transaction.on_commit()` para disparar la tarea Celery.** Si se disparara dentro del bloque `atomic()`, el worker podría llegar a leer el pedido antes de que la transacción se confirmara en la base de datos. Con `on_commit()`, la tarea se encola recién cuando el commit ya ocurrió.
-- **Polling en el frontend con `setInterval`.** El enunciado pedía reflejar el cambio de estado sin recargar. WebSockets sería la solución ideal en producción, pero agrega infraestructura (Django Channels, un channel layer sobre Redis) que excede el alcance de una prueba de 8 horas. El polling cada pocos segundos cubre el requerimiento con una complejidad razonable.
+- **WebSockets con Django Channels + Redis en vez de polling.** El enunciado pedía reflejar el cambio de estado sin recargar. `verify_payment` notifica al grupo del usuario (`orders_user_<id>`) cuando el pedido cambia de estado; el frontend abre un solo socket por sesión en vez de reconsultar la API cada pocos segundos. La autenticación del WebSocket usa el mismo `access` token de JWT, pasado como query param en el handshake (un middleware propio lo valida y arma `scope['user']`, ya que Channels no entiende de SimpleJWT por defecto).
 - **`IsAuthenticated` como permiso por defecto (`DEFAULT_PERMISSION_CLASSES`).** Protege todos los endpoints globalmente, evitando el riesgo de aplicar el permiso vista por vista y olvidarse de alguna.
 
 ## Qué haría distinto con más tiempo
 
-- WebSockets (Django Channels) en lugar de polling para el cambio de estado en tiempo real
-- Más cobertura de tests (serializers de `users`/`products`, interceptor de JWT en el frontend)
+- Reconectar el WebSocket automáticamente si el `access` expira a mitad de sesión (hoy se abre una sola vez al entrar a `/orders`)
+- Tests end-to-end del flujo completo (crear pedido → confirmar/fallar → verlo en el frontend) con Playwright
 
 ## Puntos extra implementados
 
 - Docker Compose funcional de punta a punta, incluyendo el frontend
 - Manejo de concurrencia con `select_for_update()` y `order_by('id')` para prevenir deadlocks
-- Polling en el frontend para reflejar el cambio de estado sin recargar
+- WebSockets (Django Channels + Redis) en vez de polling para reflejar el cambio de estado en tiempo real
 - Paginación en el listado de pedidos del frontend
-- Tests unitarios con `pytest` para la lógica de estados de `verify_payment` y la validación de stock
+- Tests unitarios con `pytest` (estados de `verify_payment`, validación de stock, manager de `CustomUser`, listado de `products`) y con `vitest` (interceptor de JWT del frontend)
