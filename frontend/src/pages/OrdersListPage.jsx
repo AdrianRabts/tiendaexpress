@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchOrders } from '../api/orders'
+import { connectOrdersSocket } from '../api/socket'
+import { getAccessToken } from '../api/tokenStorage'
 import OrderStatusBadge from '../components/OrderStatusBadge'
-
-const POLL_INTERVAL_MS = 4000
 
 export default function OrdersListPage() {
   const [orders, setOrders] = useState([])
@@ -38,12 +38,15 @@ export default function OrdersListPage() {
   }, [loadOrders])
 
   useEffect(() => {
-    const hasPendingOrders = orders.some((order) => order.status === 'PENDING')
-    if (!hasPendingOrders) return undefined
+    const accessToken = getAccessToken()
+    if (!accessToken) return undefined
 
-    const intervalId = setInterval(loadOrders, POLL_INTERVAL_MS)
-    return () => clearInterval(intervalId)
-  }, [orders, loadOrders])
+    const socket = connectOrdersSocket(accessToken, ({ order_id: orderId, status }) => {
+      setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status } : order)))
+    })
+
+    return () => socket.close()
+  }, [])
 
   return (
     <div className="orders-page">
